@@ -60,6 +60,9 @@ for arg in sys.argv:
             print ""
             print "Without any arguments, the script talks to the MikroTik, gathers the latest"
             print "snapshot and updates the database as relevant."
+            print ""
+            print "If the -D=<file> argument isn't used, the default database file behaviour"
+            print "is to create or open accounting.sqlite3 in the current working directory."
             sys.exit()
 # Process any other command line args
 READONLY_MODE = False
