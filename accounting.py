@@ -2,6 +2,7 @@
 import urllib2 as ul
 import sqlite3 as ps
 from sqlite3 import OperationalError
+from datetime import datetime
 import sys
 
 PRINT_STATS_AT_END = False
@@ -19,13 +20,42 @@ try:
     dr = dc.execute("SELECT * FROM accounting_totals")
 except OperationalError:
     dc.execute("CREATE TABLE accounting_totals (ha text, hb text, b real, p real)")
+try:
+    dr = dc.execute("SELECT * FROM accounting_history")
+except OperationalError:
+    dc.execute('''CREATE TABLE accounting_history
+                    (
+                        ha text,
+                        hb text,
+                        b real,
+                        p real,
+                        snap_year real,
+                        snap_month real,
+                        snap_day real,
+                        snap_hour real,
+                        snap_minute real,
+                        snap_second real
+                    )''')
 
-def update_host(ha,hb,bi,pi):
+def update_host(ha,hb,bi,pi,year,month,day,hour,minute,second):
     hs = get_host(ha,hb)
     b = int(bi)+hs['bytes']
     p = int(pi)+hs['packets']
     dc.execute("UPDATE accounting_totals SET b="+str(b)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
     dc.execute("UPDATE accounting_totals SET p="+str(p)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
+    dc.execute('''INSERT INTO accounting_history VALUES
+                    (
+                        '''+"'"+ha+"'"+''',
+                        '''+"'"+hb+"'"+''',
+                        '''+"'"+str(bi)+"'"+''',
+                        '''+"'"+str(pi)+"'"+''',
+                        '''+str(year)+''',
+                        '''+str(month)+''',
+                        '''+str(day)+''',
+                        '''+str(hour)+''',
+                        '''+str(minute)+''',
+                        '''+str(second)+'''
+                    )''')
 
 def get_host(ha,hb):
     fr = dc.execute("SELECT * FROM accounting_totals WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
@@ -58,7 +88,7 @@ for rec in res:
 # Update DB
 for host_a,ignoreMe in pds.iteritems():
     for host_b,statInfo in pds[host_a].iteritems():
-        update_host(host_a,host_b,statInfo['bytes'],statInfo['packets'])
+        update_host(host_a,host_b,statInfo['bytes'],statInfo['packets'],datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute,datetime.now().second)
 
 # Print statistics from DB
 if PRINT_STATS_AT_END:
