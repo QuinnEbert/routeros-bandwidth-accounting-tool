@@ -4,7 +4,7 @@ import sqlite3 as ps
 from sqlite3 import OperationalError
 import sys
 
-PRINT_STATS_AT_END = True
+PRINT_STATS_AT_END = False
 
 LOCALNET = '192.168.1.'
 MIKROTIK = LOCALNET+'1'
