@@ -16,22 +16,22 @@ pds = {}
 dl = ps.connect("accounting.sqlite3",isolation_level=None)
 dc = dl.cursor()
 try:
-    dr = dc.execute("SELECT * FROM accounting")
+    dr = dc.execute("SELECT * FROM accounting_totals")
 except OperationalError:
-    dc.execute("CREATE TABLE accounting (ha text, hb text, b real, p real)")
+    dc.execute("CREATE TABLE accounting_totals (ha text, hb text, b real, p real)")
 
 def update_host(ha,hb,bi,pi):
     hs = get_host(ha,hb)
     b = int(bi)+hs['bytes']
     p = int(pi)+hs['packets']
-    dc.execute("UPDATE accounting SET b="+str(b)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
-    dc.execute("UPDATE accounting SET p="+str(p)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
+    dc.execute("UPDATE accounting_totals SET b="+str(b)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
+    dc.execute("UPDATE accounting_totals SET p="+str(p)+" WHERE ha='"+ha+"' AND hb='"+hb+"'")
 
 def get_host(ha,hb):
-    fr = dc.execute("SELECT * FROM accounting WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
+    fr = dc.execute("SELECT * FROM accounting_totals WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
     if len(fr) == 0:
-        dc.execute("INSERT INTO accounting VALUES ('"+ha+"','"+hb+"',0,0)")
-        fr = dc.execute("SELECT * FROM accounting WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
+        dc.execute("INSERT INTO accounting_totals VALUES ('"+ha+"','"+hb+"',0,0)")
+        fr = dc.execute("SELECT * FROM accounting_totals WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
     return {'bytes': int(fr[0][2]), 'packets': int(fr[0][3])}
 
 # Massage the data into a more useful format
@@ -62,7 +62,7 @@ for host_a,ignoreMe in pds.iteritems():
 
 # Print statistics from DB
 if PRINT_STATS_AT_END:
-    fr = dc.execute("SELECT * FROM accounting WHERE ha LIKE '"+LOCALNET+"%' OR hb LIKE '"+LOCALNET+"%' ORDER BY b ASC").fetchall()
+    fr = dc.execute("SELECT * FROM accounting_totals WHERE ha LIKE '"+LOCALNET+"%' OR hb LIKE '"+LOCALNET+"%' ORDER BY b ASC").fetchall()
     for fr_r in fr:
         (a,b,c,d) = fr_r
         e = float( float(c) / int(1024) / int(1024) )
