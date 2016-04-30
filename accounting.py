@@ -10,10 +10,6 @@ PRINT_STATS_AT_END = False
 LOCALNET = '192.168.1.'
 MIKROTIK = LOCALNET+'1'
 
-res = ul.urlopen(ul.Request('http://'+MIKROTIK+'/accounting/ip.cgi')).read().rstrip().split("\n")
-
-pds = {}
-
 dl = ps.connect("accounting.sqlite3",isolation_level=None)
 dc = dl.cursor()
 try:
@@ -64,31 +60,67 @@ def get_host(ha,hb):
         fr = dc.execute("SELECT * FROM accounting_totals WHERE ha='"+ha+"' AND hb='"+hb+"'").fetchall()
     return {'bytes': int(fr[0][2]), 'packets': int(fr[0][3])}
 
-# Massage the data into a more useful format
-for rec in res:
-    col = rec.split(" ")
-    host_a = col[0]
-    host_b = col[1]
-    n_Byts = col[2]
-    n_Pkts = col[3]
-    if not host_a in pds:
-        pds[host_a] = {}
-        pds[host_a][host_b] = {}
-        pds[host_a][host_b]['bytes'] = int(n_Byts)
-        pds[host_a][host_b]['packets'] = int(n_Pkts)
+# Display help if user requests it
+bInitArg = True
+for arg in sys.argv:
+    if bInitArg:
+        bInitArg = False
     else:
-        if not host_b in pds[host_a]:
+        if arg=="-H" or arg=="--help":
+            print "MikroTik RouterOS bandwidth accounting toolbox by Quinn Ebert"
+            print ""
+            print "USAGE:"
+            print sys.argv[0]+" [--help|-H] [--readonly|-R] [--stats-lifetime|-A]"
+            print ""
+            print "            --help|-H   shows this help message and exits"
+            print "        --readonly|-R   don't gather/reset latest accounting snapshot"
+            print "  --stats-lifetime|-A   show A=>B lifetime byte/packet totals (forces -R)"
+            print ""
+            print "Without any arguments, the script talks to the MikroTik, gathers the latest"
+            print "snapshot and updates the database as relevant."
+            sys.exit()
+# Process any other command line args
+READONLY_MODE = False
+bInitArg = True
+for arg in sys.argv:
+    if bInitArg:
+        bInitArg = False
+    else:
+        if arg=="-R" or arg=="--readonly":
+            READONLY_MODE = True
+        elif arg=="-A" or arg=="--stats-lifetime":
+            READONLY_MODE = True
+            PRINT_STATS_AT_END = True
+
+if not READONLY_MODE:
+    res = ul.urlopen(ul.Request('http://'+MIKROTIK+'/accounting/ip.cgi')).read().rstrip().split("\n")
+    pds = {}
+    # Massage the data into a more useful format
+    for rec in res:
+        col = rec.split(" ")
+        host_a = col[0]
+        host_b = col[1]
+        n_Byts = col[2]
+        n_Pkts = col[3]
+        if not host_a in pds:
+            pds[host_a] = {}
             pds[host_a][host_b] = {}
             pds[host_a][host_b]['bytes'] = int(n_Byts)
             pds[host_a][host_b]['packets'] = int(n_Pkts)
         else:
-            pds[host_a][host_b]['bytes'] += int(n_Byts)
-            pds[host_a][host_b]['packets'] += int(n_Pkts)
-
-# Update DB
-for host_a,ignoreMe in pds.iteritems():
-    for host_b,statInfo in pds[host_a].iteritems():
-        update_host(host_a,host_b,statInfo['bytes'],statInfo['packets'],datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute,datetime.now().second)
+            if not host_b in pds[host_a]:
+                pds[host_a][host_b] = {}
+                pds[host_a][host_b]['bytes'] = int(n_Byts)
+                pds[host_a][host_b]['packets'] = int(n_Pkts)
+            else:
+                pds[host_a][host_b]['bytes'] += int(n_Byts)
+                pds[host_a][host_b]['packets'] += int(n_Pkts)
+    # Update DB
+    for host_a,ignoreMe in pds.iteritems():
+        for host_b,statInfo in pds[host_a].iteritems():
+            update_host(host_a,host_b,statInfo['bytes'],statInfo['packets'],datetime.now().year,datetime.now().month,datetime.now().day,datetime.now().hour,datetime.now().minute,datetime.now().second)
+else:
+    print "[Read Only Mode Active]\n"
 
 # Print statistics from DB
 if PRINT_STATS_AT_END:
