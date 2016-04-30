@@ -10,28 +10,9 @@ PRINT_STATS_AT_END = False
 LOCALNET = '192.168.1.'
 MIKROTIK = LOCALNET+'1'
 
-dl = ps.connect("accounting.sqlite3",isolation_level=None)
-dc = dl.cursor()
-try:
-    dr = dc.execute("SELECT * FROM accounting_totals")
-except OperationalError:
-    dc.execute("CREATE TABLE accounting_totals (ha text, hb text, b real, p real)")
-try:
-    dr = dc.execute("SELECT * FROM accounting_history")
-except OperationalError:
-    dc.execute('''CREATE TABLE accounting_history
-                    (
-                        ha text,
-                        hb text,
-                        b real,
-                        p real,
-                        snap_year real,
-                        snap_month real,
-                        snap_day real,
-                        snap_hour real,
-                        snap_minute real,
-                        snap_second real
-                    )''')
+dl = None
+dc = None
+dr = None
 
 def update_host(ha,hb,bi,pi,year,month,day,hour,minute,second):
     hs = get_host(ha,hb)
@@ -70,17 +51,19 @@ for arg in sys.argv:
             print "MikroTik RouterOS bandwidth accounting toolbox by Quinn Ebert"
             print ""
             print "USAGE:"
-            print sys.argv[0]+" [--help|-H] [--readonly|-R] [--stats-lifetime|-A]"
+            print sys.argv[0]+" [--help|-H] [--readonly|-R] [--stats-lifetime|-A] [-D=<file>]"
             print ""
             print "            --help|-H   shows this help message and exits"
             print "        --readonly|-R   don't gather/reset latest accounting snapshot"
             print "  --stats-lifetime|-A   show A=>B lifetime byte/packet totals (forces -R)"
+            print "            -D=<file>   use <file> for database, not the built-in default"
             print ""
             print "Without any arguments, the script talks to the MikroTik, gathers the latest"
             print "snapshot and updates the database as relevant."
             sys.exit()
 # Process any other command line args
 READONLY_MODE = False
+DATABASE_FILE = "accounting.sqlite3"
 bInitArg = True
 for arg in sys.argv:
     if bInitArg:
@@ -91,6 +74,31 @@ for arg in sys.argv:
         elif arg=="-A" or arg=="--stats-lifetime":
             READONLY_MODE = True
             PRINT_STATS_AT_END = True
+        elif arg.startswith("-D="):
+            DATABASE_FILE = arg.split("=")[1]
+
+dl = ps.connect(DATABASE_FILE,isolation_level=None)
+dc = dl.cursor()
+try:
+    dr = dc.execute("SELECT * FROM accounting_totals")
+except OperationalError:
+    dc.execute("CREATE TABLE accounting_totals (ha text, hb text, b real, p real)")
+try:
+    dr = dc.execute("SELECT * FROM accounting_history")
+except OperationalError:
+    dc.execute('''CREATE TABLE accounting_history
+                    (
+                        ha text,
+                        hb text,
+                        b real,
+                        p real,
+                        snap_year real,
+                        snap_month real,
+                        snap_day real,
+                        snap_hour real,
+                        snap_minute real,
+                        snap_second real
+                    )''')
 
 if not READONLY_MODE:
     res = ul.urlopen(ul.Request('http://'+MIKROTIK+'/accounting/ip.cgi')).read().rstrip().split("\n")
